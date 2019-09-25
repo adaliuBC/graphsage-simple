@@ -37,7 +37,6 @@ class MeanAggregator(nn.Module):
         """
         #pdb.set_trace()
         # Local pointers to functions (speed hack)
-#        print "node_num1:", nodes[0], "\tto_neigh:", to_neighs[0]
         _set = set
         if not num_sample is None:
             _sample = random.sample
@@ -46,7 +45,6 @@ class MeanAggregator(nn.Module):
                             )) if len(to_neigh) >= num_sample else to_neigh for to_neigh in to_neighs]
         else:
             samp_neighs = to_neighs
-#        print "sample_neigh:", samp_neighs[0]
         if self.gcn:
             samp_neighs = [samp_neigh + set([nodes[i]]) for i, samp_neigh in enumerate(samp_neighs)]
         unique_nodes_list = list(set.union(*samp_neighs))
@@ -55,24 +53,35 @@ class MeanAggregator(nn.Module):
         mask = Variable(torch.zeros(len(samp_neighs), len(unique_nodes)))
         column_indices = [unique_nodes[n] for samp_neigh in samp_neighs for n in samp_neigh]   
         row_indices = [i for i in range(len(samp_neighs)) for j in range(len(samp_neighs[i]))]
-#        print "column_indice:", column_indices[:10]
-#        print "row_indice:", row_indices[:10], row_indices[-10:]
         #pdb.set_trace()
         mask[row_indices, column_indices] = 1
         if self.cuda:
             mask = mask.cuda()
         num_neigh = mask.sum(1, keepdim=True)
-#        print "mask.sum():", len(num_neigh)
         mask = mask.div(num_neigh)
-        #print "size_list:", np.shape(unique_nodes_list)
         if self.cuda:
             embed_matrix = self.features(torch.LongTensor(unique_nodes_list).cuda())
         else:
             embed_matrix = self.features(torch.LongTensor(unique_nodes_list))
         #print "size_matrix:", embed_matrix.shape
         #pdb.set_trace()
-        embed_matrix = embed_matrix.t()
+        
+        for i in range(0, len(nodes)):
+            for j in range(0, len(unique_nodes_list)):
+                output2 = mask[i, j]*embed_matrix[j]
+                output3 = F.relu(output2)
+                if j==0:
+                    output_line = output3
+                else:
+                    output_line += output3
+            if i==0:
+                output_all = output_line
+            else:
+                output_all = torch.cat((output_all, output_line), 0)
+        output_all = torch.reshape(output_all, (len(nodes))
+        to_feats = weight.mm(embed_matrix.t())
+        '''embed_matrix = embed_matrix.t()
         feat_base = weight.mm(embed_matrix)
         feat = F.relu(feat_base).t()
-        to_feats = mask.mm(feat)
-        return to_feats
+        to_feats = mask.mm(feat)'''
+        return to_feats.t()
